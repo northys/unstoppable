@@ -1,0 +1,19 @@
+{
+  "name": "unstoppable",
+  "version": "1.0.0",
+  "description": "Product data scraper for thomann.de and other websites",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "npm run start:dev",
+    "start:dev": "ts-node-esm -T src/main.ts",
+    "start:prod": "node dist/main.js",
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["scraper", "crawlee", "thomann"],
+  "author": "",
+  "license": "ISC"
+}
