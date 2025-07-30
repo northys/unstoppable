@@ -17,7 +17,7 @@ async function main() {
     await crawler.exportData('json');
     log.info('Scraping completed successfully!');
   } catch (error) {
-    log.error('Scraping failed:', error);
+    log.error('Scraping failed:', error as Error);
     process.exit(1);
   }
 }

@@ -1,6 +1,7 @@
-import { CheerioCrawler, ProxyConfiguration, Dataset, RequestQueue, log } from 'crawlee';
+import { CheerioCrawler, ProxyConfiguration, Dataset, log } from 'crawlee';
+import { CheerioAPI } from 'cheerio';
 import { BaseScraper } from '../scrapers/BaseScraper.js';
-import { Product } from '../models/Product.js';
+import { ThomannScraper } from '../scrapers/ThomannScraper.js';
 
 export interface CrawlerOptions {
   scraper: BaseScraper;
@@ -29,7 +30,7 @@ export class ProductCrawler {
       maxRequestRetries: 3,
       requestHandlerTimeoutSecs: 60,
       
-      async requestHandler({ request, $, enqueueLinks, pushData }) {
+      requestHandler: async ({ request, $, enqueueLinks, pushData }) => {
         log.info(`Processing ${request.url}`);
 
         try {
@@ -44,24 +45,24 @@ export class ProductCrawler {
         }
       },
 
-      async failedRequestHandler({ request }, error) {
+      failedRequestHandler: async ({ request }, error) => {
         log.error(`Request ${request.url} failed after retries: ${error}`);
       },
     });
   }
 
-  private async handleProductPage($: any, url: string, pushData: any): Promise<void> {
-    const product = this.scraper.parseProductDetail($);
+  private async handleProductPage($: CheerioAPI, url: string, pushData: any): Promise<void> {
+    const product = (this.scraper as ThomannScraper).parseProductDetail($);
     product.url = url;
     
     await pushData(product);
     log.info(`Scraped product: ${product.name}`);
   }
 
-  private async handleCategoryPage($: any, url: string, enqueueLinks: any): Promise<void> {
+  private async handleCategoryPage($: CheerioAPI, _url: string, enqueueLinks: any): Promise<void> {
     await enqueueLinks({
       selector: 'a',
-      transformRequestFunction: (req) => {
+      transformRequestFunction: (req: any) => {
         if (this.scraper.isProductUrl(req.url) || this.scraper.isCategoryUrl(req.url)) {
           return req;
         }

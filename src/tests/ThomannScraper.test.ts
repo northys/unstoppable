@@ -1,11 +1,8 @@
 import { describe, test, expect, beforeAll } from '@jest/globals';
 import { load } from 'cheerio';
 import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { ThomannScraper } from '../scrapers/ThomannScraper.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('ThomannScraper', () => {
   let scraper: ThomannScraper;
@@ -14,8 +11,8 @@ describe('ThomannScraper', () => {
 
   beforeAll(() => {
     scraper = new ThomannScraper();
-    productPageHtml = readFileSync(join(__dirname, 'fixtures', 'thomann-product-page.html'), 'utf-8');
-    categoryPageHtml = readFileSync(join(__dirname, 'fixtures', 'thomann-category-page.html'), 'utf-8');
+    productPageHtml = readFileSync(join(process.cwd(), 'src', 'tests', 'fixtures', 'thomann-product-page.html'), 'utf-8');
+    categoryPageHtml = readFileSync(join(process.cwd(), 'src', 'tests', 'fixtures', 'thomann-category-page.html'), 'utf-8');
   });
 
   describe('URL detection', () => {
@@ -100,7 +97,6 @@ describe('ThomannScraper', () => {
       ];
 
       testCases.forEach(({ input, expected }) => {
-        const $ = load(`<div class="product-price">${input}</div>`);
         const price = scraper['parsePrice'](input);
         expect(price.amount).toBe(expected);
         expect(price.currency).toBe('EUR');

@@ -10,7 +10,7 @@ export class ThomannScraper extends BaseScraper {
     });
   }
 
-  async scrapeProductList(url: string): Promise<ScraperResult> {
+  async scrapeProductList(_url: string): Promise<ScraperResult> {
     const products: Product[] = [];
     return {
       products,
@@ -18,7 +18,7 @@ export class ThomannScraper extends BaseScraper {
     };
   }
 
-  async scrapeProductDetail(url: string): Promise<Product> {
+  async scrapeProductDetail(_url: string): Promise<Product> {
     return {} as Product;
   }
 
@@ -49,8 +49,8 @@ export class ThomannScraper extends BaseScraper {
     return /\/de\/.*\.html$/.test(url) || url.includes('/de/cat_');
   }
 
-  parseProductFromList($: CheerioAPI, element: any): Partial<Product> {
-    const $item = $(element);
+  parseProductFromList($: CheerioAPI, element: unknown): Partial<Product> {
+    const $item = $(element as any);
     
     const name = $item.find('.product-title').text().trim();
     const priceText = $item.find('.product-price').text().trim();
