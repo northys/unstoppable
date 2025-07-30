@@ -8,6 +8,8 @@
     "start": "npm run start:dev",
     "start:dev": "ts-node-esm -T src/main.ts",
     "start:prod": "node dist/main.js",
+    "extract-categories": "ts-node-esm -T src/extract-categories.ts",
+    "extract-categories:prod": "node dist/extract-categories.js",
     "build": "tsc",
     "test": "jest",
     "lint": "eslint src --ext .ts",
@@ -21,6 +23,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "commander": "^14.0.0",
     "crawlee": "^3.14.0"
   },
   "devDependencies": {

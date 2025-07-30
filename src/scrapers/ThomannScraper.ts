@@ -1,6 +1,8 @@
 import { CheerioAPI } from 'cheerio';
 import { BaseScraper } from './BaseScraper.js';
 import { Product, ScraperResult } from '../models/Product.js';
+import { Category } from '../models/Category.js';
+import { validateCategory } from '../utils/validation.js';
 
 export class ThomannScraper extends BaseScraper {
   constructor() {
@@ -146,5 +148,87 @@ export class ThomannScraper extends BaseScraper {
       currency: 'EUR',
       amount,
     };
+  }
+
+  extractCategories($: CheerioAPI): Category[] {
+    const categories: Category[] = [];
+    
+    // Extract main categories
+    $('.categories-list__item a, .main-menu__item a').each((_, element) => {
+      const $el = $(element);
+      const href = $el.attr('href');
+      const dataCode = $el.attr('data-gtm-key-anja') || $el.attr('data-category-code') || '';
+      
+      if (!href) return;
+      
+      const category: Partial<Category> = {
+        name: $el.text().trim(),
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        code: dataCode || this.extractCodeFromUrl(href),
+        level: 0,
+        source: this.config.name,
+      };
+      
+      const validated = validateCategory(category);
+      if (validated) {
+        categories.push(validated);
+      }
+    });
+    
+    // Extract subcategories if present
+    $('.subcategories-list__item a, .category-tree__item a').each((_, element) => {
+      const $el = $(element);
+      const href = $el.attr('href');
+      const parentText = $el.closest('.category-group').find('.category-title').text().trim();
+      
+      if (!href) return;
+      
+      const category: Partial<Category> = {
+        name: $el.text().trim(),
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        code: this.extractCodeFromUrl(href),
+        parentCategory: parentText,
+        level: 1,
+        source: this.config.name,
+      };
+      
+      const validated = validateCategory(category);
+      if (validated) {
+        categories.push(validated);
+      }
+    });
+    
+    return categories;
+  }
+
+  private extractCodeFromUrl(url: string): string {
+    // Extract category code from URL patterns like /de/GI_guitars.html
+    const match = url.match(/\/([A-Z]{2,3})_[\w-]+\.html?$/);
+    if (match) return match[1];
+    
+    // Extract from path segments
+    const segments = url.split('/');
+    const lastSegment = segments[segments.length - 1];
+    const code = lastSegment.replace(/[_.-].*$/, '').toUpperCase();
+    
+    return code.length <= 3 ? code : '';
+  }
+
+  async scrapeCategoryPage(_url: string, $: CheerioAPI): Promise<Category[]> {
+    const categories = this.extractCategories($);
+    
+    // Add product count if available
+    categories.forEach(category => {
+      const countElement = $(`.category-item[data-url="${category.url}"] .product-count`);
+      if (countElement.length) {
+        const countText = countElement.text();
+        const count = parseInt(countText.replace(/\D/g, ''));
+        if (!isNaN(count)) {
+          category.productCount = count;
+        }
+      }
+    });
+    
+    return categories;
   }
 }
