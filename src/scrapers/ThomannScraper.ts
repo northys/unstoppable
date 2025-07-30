@@ -141,7 +141,10 @@ export class ThomannScraper extends BaseScraper {
   }
 
   private parsePrice(priceText: string): Product['price'] {
-    const cleanPrice = priceText.replace(/[^\d,.-]/g, '').replace(',', '.');
+    // Remove all non-numeric characters except comma and period
+    let cleanPrice = priceText.replace(/[^\d,.-]/g, '');
+    // Handle German number format (1.234,56) by removing thousand separators
+    cleanPrice = cleanPrice.replace(/\.(?=\d{3})/g, '').replace(',', '.');
     const amount = parseFloat(cleanPrice) || 0;
     
     return {
@@ -169,9 +172,11 @@ export class ThomannScraper extends BaseScraper {
         source: this.config.name,
       };
       
-      const validated = validateCategory(category);
-      if (validated) {
+      try {
+        const validated = validateCategory(category);
         categories.push(validated);
+      } catch (error) {
+        // Skip invalid categories
       }
     });
     
@@ -192,9 +197,11 @@ export class ThomannScraper extends BaseScraper {
         source: this.config.name,
       };
       
-      const validated = validateCategory(category);
-      if (validated) {
+      try {
+        const validated = validateCategory(category);
         categories.push(validated);
+      } catch (error) {
+        // Skip invalid categories
       }
     });
     
@@ -206,12 +213,18 @@ export class ThomannScraper extends BaseScraper {
     const match = url.match(/\/([A-Z]{2,3})_[\w-]+\.html?$/);
     if (match) return match[1];
     
-    // Extract from path segments
-    const segments = url.split('/');
-    const lastSegment = segments[segments.length - 1];
-    const code = lastSegment.replace(/[_.-].*$/, '').toUpperCase();
+    // Try to extract from the filename
+    const filename = url.split('/').pop() || '';
+    const cleanName = filename.replace(/\.html?$/, '').replace(/[_-]/g, ' ');
     
-    return code.length <= 3 ? code : '';
+    // Generate a code from the first letters of words
+    const words = cleanName.split(/\s+/);
+    if (words.length >= 2) {
+      return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    }
+    
+    // Fallback to first 2-3 characters
+    return cleanName.substring(0, 2).toUpperCase() || 'XX';
   }
 
   async scrapeCategoryPage(_url: string, $: CheerioAPI): Promise<Category[]> {

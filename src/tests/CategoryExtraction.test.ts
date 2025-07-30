@@ -129,7 +129,7 @@ describe('Category Extraction', () => {
         { url: '/de/GI_guitars.html', expected: 'GI' },
         { url: '/de/DR_drums_and_percussion.html', expected: 'DR' },
         { url: '/de/TA_keys.html', expected: 'TA' },
-        { url: '/de/some_category.html', expected: '' },
+        { url: '/de/some_category.html', expected: 'SC' },
       ];
 
       testCases.forEach(({ url, expected }) => {
