@@ -33,7 +33,9 @@ npm install
 
 ## Usage
 
-### Development
+### Product Scraping
+
+#### Development
 
 ```bash
 npm start
@@ -41,11 +43,32 @@ npm start
 npm run start:dev
 ```
 
-### Production
+#### Production
 
 ```bash
 npm run build
 npm run start:prod
+```
+
+### Category Extraction
+
+Extract categories from e-commerce websites:
+
+```bash
+# Extract all categories from Thomann
+npm run extract-categories
+
+# Extract from specific URL
+npm run extract-categories -- --url https://www.thomann.de/de/index.html
+
+# Export as CSV
+npm run extract-categories -- --format csv
+
+# Build category tree structure
+npm run extract-categories -- --tree
+
+# Verbose logging
+npm run extract-categories -- --verbose
 ```
 
 ### Testing
@@ -96,7 +119,9 @@ const crawler = new ProductCrawler({ scraper });
 await crawler.run();
 ```
 
-## Data Model
+## Data Models
+
+### Product Model
 
 Products are scraped with the following structure:
 
@@ -126,6 +151,24 @@ interface Product {
     count: number;
   };
   url: string;
+  scrapedAt: Date;
+  source: string;
+}
+```
+
+### Category Model
+
+Categories are extracted with the following structure:
+
+```typescript
+interface Category {
+  name: string;
+  url: string;
+  code: string;
+  parentCategory?: string;
+  level: number;
+  productCount?: number;
+  subcategories?: Category[];
   scrapedAt: Date;
   source: string;
 }
