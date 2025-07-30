@@ -166,7 +166,7 @@ export class ThomannScraper extends BaseScraper {
       
       const category: Partial<Category> = {
         name: $el.text().trim(),
-        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href.startsWith('/') ? '' : '/'}${href}`,
         code: dataCode || this.extractCodeFromUrl(href),
         level: 0,
         source: this.config.name,
@@ -190,7 +190,7 @@ export class ThomannScraper extends BaseScraper {
       
       const category: Partial<Category> = {
         name: $el.text().trim(),
-        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href.startsWith('/') ? '' : '/'}${href}`,
         code: this.extractCodeFromUrl(href),
         parentCategory: parentText,
         level: 1,
@@ -265,7 +265,7 @@ export class ThomannScraper extends BaseScraper {
       
       const subcategory: Partial<Subcategory> = {
         name: $title.text().trim(),
-        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href.startsWith('/') ? '' : '/'}${href}`,
         imageUrl: $img.attr('src') || '',
         imageUrlWebp: $source.attr('srcset') || '',
         parentCategory,
@@ -297,7 +297,7 @@ export class ThomannScraper extends BaseScraper {
       
       const subcategory: Partial<Subcategory> = {
         name,
-        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href.startsWith('/') ? '' : '/'}${href}`,
         imageUrl: $img.attr('src') || '',
         imageUrlWebp: '',
         parentCategory,
