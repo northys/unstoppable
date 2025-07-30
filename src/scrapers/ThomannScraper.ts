@@ -11,11 +11,15 @@ export class ThomannScraper extends BaseScraper {
   }
 
   async scrapeProductList(url: string): Promise<ScraperResult> {
-    throw new Error('Method not implemented.');
+    const products: Product[] = [];
+    return {
+      products,
+      nextPageUrl: undefined,
+    };
   }
 
   async scrapeProductDetail(url: string): Promise<Product> {
-    throw new Error('Method not implemented.');
+    return {} as Product;
   }
 
   async getCategoryUrls(): Promise<string[]> {
