@@ -3,7 +3,7 @@ import type { CheerioCrawlingContext } from 'crawlee';
 import { CheerioAPI } from 'cheerio';
 import { BaseScraper } from '../scrapers/BaseScraper.js';
 import { ThomannScraper } from '../scrapers/ThomannScraper.js';
-import { Category, CategoryTree } from '../models/Category.js';
+import { Category, CategoryTree, Subcategory, CrawlProgress } from '../models/Category.js';
 import { CategoryExtractionError } from '../utils/errors.js';
 
 export interface CategoryCrawlerOptions {
@@ -11,14 +11,25 @@ export interface CategoryCrawlerOptions {
   proxyUrls?: string[];
   maxRequestsPerCrawl?: number;
   buildTree?: boolean;
+  extractSubcategories?: boolean;
+  onProgress?: (progress: CrawlProgress) => void;
 }
 
 export class CategoryCrawler {
   private scraper: BaseScraper;
   private crawler: CheerioCrawler;
+  private options: CategoryCrawlerOptions;
   private categories: Map<string, Category> = new Map();
+  private subcategories: Map<string, Subcategory[]> = new Map();
+  private progress: CrawlProgress = {
+    totalCategories: 0,
+    processedCategories: 0,
+    totalSubcategories: 0,
+    failedRequests: [],
+  };
 
   constructor(options: CategoryCrawlerOptions) {
+    this.options = options;
     this.scraper = options.scraper;
 
     const proxyConfiguration = options.proxyUrls 
@@ -34,15 +45,21 @@ export class CategoryCrawler {
       
       requestHandler: async (context: CheerioCrawlingContext) => {
         const { request, $, log } = context;
+        const { userData } = request;
         
-        log.info(`Processing categories from ${request.url}`);
+        log.info(`Processing ${userData?.type || 'main'} page: ${request.url}`);
 
         try {
-          await this.handleCategoryPage($, request.url);
+          if (!userData?.type || userData.type === 'main') {
+            await this.handleMainPage($, request.url, context);
+          } else if (userData.type === 'category') {
+            await this.handleCategoryPage($, request.url, userData, context);
+          }
         } catch (error) {
           log.error(`Error processing ${request.url}: ${error}`);
+          this.progress.failedRequests.push(request.url);
           throw new CategoryExtractionError(
-            `Failed to extract categories from ${request.url}`,
+            `Failed to extract from ${request.url}`,
             request.url,
             error instanceof Error ? error.message : String(error)
           );
@@ -55,42 +72,115 @@ export class CategoryCrawler {
     });
   }
 
-  private async handleCategoryPage($: CheerioAPI, url: string): Promise<void> {
+  private async handleMainPage($: CheerioAPI, _url: string, _context: CheerioCrawlingContext): Promise<void> {
     if (this.scraper instanceof ThomannScraper) {
-      const categories = await this.scraper.scrapeCategoryPage(url, $);
+      const categories = this.scraper.extractCategories($);
       
       for (const category of categories) {
         this.categories.set(category.code, category);
         log.info(`Found category: ${category.name} (${category.code})`);
       }
-
-      // Follow pagination if exists
-      const nextPageLink = $('.pagination .next a').attr('href');
-      if (nextPageLink) {
-        await this.crawler.addRequests([nextPageLink]);
+      
+      this.progress.totalCategories = categories.length;
+      this.updateProgress();
+      
+      // Enqueue category pages for subcategory extraction if enabled
+      if (this.options.extractSubcategories) {
+        for (const category of categories) {
+          await this.crawler.addRequests([{
+            url: category.url,
+            userData: {
+              type: 'category',
+              parentCategory: category.name,
+              parentCode: category.code,
+            },
+          }]);
+        }
       }
+    }
+  }
+
+  private async handleCategoryPage(
+    $: CheerioAPI, 
+    _url: string, 
+    userData: any,
+    _context: CheerioCrawlingContext
+  ): Promise<void> {
+    if (this.scraper instanceof ThomannScraper) {
+      const { parentCategory, parentCode } = userData;
+      const subcategories = await this.scraper.extractSubcategories($, parentCategory, parentCode);
+      
+      if (subcategories.length > 0) {
+        this.subcategories.set(parentCode, subcategories);
+        this.progress.totalSubcategories += subcategories.length;
+        log.info(`Found ${subcategories.length} subcategories in ${parentCategory}`);
+        
+        for (const sub of subcategories) {
+          log.debug(`  - ${sub.name}`);
+        }
+      }
+      
+      this.progress.processedCategories++;
+      this.updateProgress();
+    }
+  }
+
+  private updateProgress(): void {
+    if (this.options.onProgress) {
+      this.options.onProgress(this.progress);
     }
   }
 
   async run(startUrls?: string[]): Promise<void> {
     const urls = startUrls || [this.scraper.getBaseUrl()];
     
-    await this.crawler.addRequests(urls);
+    // Add main page requests
+    const requests = urls.map(url => ({
+      url,
+      userData: { type: 'main' as const },
+    }));
+    
+    await this.crawler.addRequests(requests);
     await this.crawler.run();
     
+    // Save categories
     const categoriesArray = Array.from(this.categories.values());
-    await Dataset.pushData(categoriesArray);
+    const categoriesDataset = await Dataset.open('categories');
+    await categoriesDataset.pushData(categoriesArray);
     
-    log.info(`Category extraction completed. Found ${categoriesArray.length} categories.`);
+    // Save subcategories if extracted
+    if (this.options.extractSubcategories) {
+      const allSubcategories: Subcategory[] = [];
+      for (const subs of this.subcategories.values()) {
+        allSubcategories.push(...subs);
+      }
+      
+      const subcategoriesDataset = await Dataset.open('subcategories');
+      await subcategoriesDataset.pushData(allSubcategories);
+      
+      log.info(`Extraction completed: ${categoriesArray.length} categories, ${allSubcategories.length} subcategories.`);
+    } else {
+      log.info(`Category extraction completed. Found ${categoriesArray.length} categories.`);
+    }
   }
 
   async exportCategories(format: 'json' | 'csv' = 'json'): Promise<void> {
-    const dataset = await Dataset.open();
+    const categoriesDataset = await Dataset.open('categories');
     
     if (format === 'json') {
-      await dataset.exportToJSON('categories');
+      await categoriesDataset.exportToJSON('categories');
     } else {
-      await dataset.exportToCSV('categories');
+      await categoriesDataset.exportToCSV('categories');
+    }
+    
+    if (this.options.extractSubcategories) {
+      const subcategoriesDataset = await Dataset.open('subcategories');
+      
+      if (format === 'json') {
+        await subcategoriesDataset.exportToJSON('subcategories');
+      } else {
+        await subcategoriesDataset.exportToCSV('subcategories');
+      }
     }
   }
 
@@ -135,5 +225,21 @@ export class CategoryCrawler {
 
   getCategoryByCode(code: string): Category | undefined {
     return this.categories.get(code);
+  }
+
+  getSubcategories(categoryCode: string): Subcategory[] {
+    return this.subcategories.get(categoryCode) || [];
+  }
+
+  getAllSubcategories(): Subcategory[] {
+    const all: Subcategory[] = [];
+    for (const subs of this.subcategories.values()) {
+      all.push(...subs);
+    }
+    return all;
+  }
+
+  getProgress(): CrawlProgress {
+    return { ...this.progress };
   }
 }

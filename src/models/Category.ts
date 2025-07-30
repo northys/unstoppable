@@ -10,6 +10,18 @@ export interface Category {
   source: string;
 }
 
+export interface Subcategory {
+  name: string;
+  url: string;
+  imageUrl: string;
+  imageUrlWebp: string;
+  parentCategory: string;
+  parentCategoryCode: string;
+  productCount?: number;
+  scrapedAt: Date;
+  source: string;
+}
+
 export interface CategoryTree {
   root: Category[];
   totalCategories: number;
@@ -17,5 +29,23 @@ export interface CategoryTree {
 
 export interface CategoryExtractionResult {
   categories: Category[];
+  subcategories?: Subcategory[];
   tree?: CategoryTree;
+}
+
+export interface CrawlRequest {
+  url: string;
+  userData: {
+    type: 'main' | 'category' | 'products';
+    parentCategory?: string;
+    parentCode?: string;
+    subcategory?: string;
+  };
+}
+
+export interface CrawlProgress {
+  totalCategories: number;
+  processedCategories: number;
+  totalSubcategories: number;
+  failedRequests: string[];
 }

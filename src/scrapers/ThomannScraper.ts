@@ -1,8 +1,8 @@
 import { CheerioAPI } from 'cheerio';
 import { BaseScraper } from './BaseScraper.js';
 import { Product, ScraperResult } from '../models/Product.js';
-import { Category } from '../models/Category.js';
-import { validateCategory } from '../utils/validation.js';
+import { Category, Subcategory } from '../models/Category.js';
+import { validateCategory, validateSubcategory } from '../utils/validation.js';
 
 export class ThomannScraper extends BaseScraper {
   constructor() {
@@ -243,5 +243,82 @@ export class ThomannScraper extends BaseScraper {
     });
     
     return categories;
+  }
+
+  async extractSubcategories($: CheerioAPI, parentCategory: string, parentCode: string): Promise<Subcategory[]> {
+    const subcategories: Subcategory[] = [];
+    
+    // Extract subcategories from the category grid
+    $('.fx-category-grid__item').each((_, el) => {
+      const $item = $(el);
+      const $link = $item.closest('a');
+      const $img = $item.find('img.fx-image');
+      const $source = $item.find('source');
+      const $title = $item.find('.fx-category-grid__title');
+      
+      // Get the href from the parent link
+      const href = $link.attr('href') || '';
+      
+      // Extract product count if available
+      const countText = $item.find('.fx-category-grid__count').text();
+      const productCount = countText ? parseInt(countText.replace(/\D/g, '')) : undefined;
+      
+      const subcategory: Partial<Subcategory> = {
+        name: $title.text().trim(),
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        imageUrl: $img.attr('src') || '',
+        imageUrlWebp: $source.attr('srcset') || '',
+        parentCategory,
+        parentCategoryCode: parentCode,
+        productCount,
+        source: this.config.name,
+      };
+      
+      try {
+        const validated = validateSubcategory(subcategory);
+        subcategories.push(validated);
+      } catch (error) {
+        // Skip invalid subcategories
+      }
+    });
+    
+    // Also check for alternative subcategory selectors
+    $('.subcategory-item, .category-list__item').each((_, el) => {
+      const $item = $(el);
+      const $link = $item.find('a').first();
+      const $img = $item.find('img').first();
+      const name = $link.text().trim() || $item.find('.subcategory-name').text().trim();
+      const href = $link.attr('href') || '';
+      
+      if (!name || !href) return;
+      
+      // Check if we already have this subcategory
+      if (subcategories.some(sub => sub.name === name)) return;
+      
+      const subcategory: Partial<Subcategory> = {
+        name,
+        url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+        imageUrl: $img.attr('src') || '',
+        imageUrlWebp: '',
+        parentCategory,
+        parentCategoryCode: parentCode,
+        source: this.config.name,
+      };
+      
+      try {
+        const validated = validateSubcategory(subcategory);
+        subcategories.push(validated);
+      } catch (error) {
+        // Skip invalid subcategories
+      }
+    });
+    
+    return subcategories;
+  }
+
+  isMainPage(url: string): boolean {
+    return url === this.config.baseUrl || 
+           url === `${this.config.baseUrl}/` ||
+           url.includes('/index.html');
   }
 }
